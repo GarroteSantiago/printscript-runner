@@ -1,10 +1,17 @@
+# syntax=docker/dockerfile:1
 FROM eclipse-temurin:21-jdk AS build
 WORKDIR /app
+# PrintScript se baja de GitHub Packages, que pide token incluso para leer. Llega como secreto de
+# BuildKit (docker build --secret id=github_token,env=GITHUB_TOKEN) y no queda en ninguna capa.
+ARG GITHUB_ACTOR=github-actions
+ENV GITHUB_ACTOR=${GITHUB_ACTOR}
 COPY gradlew settings.gradle.kts build.gradle.kts gradle.properties ./
 COPY gradle gradle
-RUN ./gradlew dependencies --no-daemon > /dev/null
+RUN --mount=type=secret,id=github_token,env=GITHUB_TOKEN,required=true \
+    ./gradlew dependencies --no-daemon > /dev/null
 COPY src src
-RUN ./gradlew bootJar --no-daemon
+RUN --mount=type=secret,id=github_token,env=GITHUB_TOKEN,required=true \
+    ./gradlew bootJar --no-daemon
 
 FROM eclipse-temurin:21-jre
 RUN useradd --system --no-create-home app

@@ -19,8 +19,12 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # El token baja PrintScript de GitHub Packages
       - name: Check
         run: nix develop --command ./gradlew check
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Image name
         id: meta
@@ -36,11 +40,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Tags: <rama> (lo que despliega el stack) y <rama>-<sha> (para volver atrás)
+      # Tags: <rama> (lo que despliega el stack) y <rama>-<sha> (para volver atrás).
+      # El token entra como secreto de BuildKit, no como build arg, para que no quede en la imagen.
       - uses: docker/build-push-action@v6
         with:
           context: .
           push: true
+          build-args: |
+            GITHUB_ACTOR=${{ github.actor }}
+          secrets: |
+            github_token=${{ secrets.GITHUB_TOKEN }}
           tags: |
             ${{ steps.meta.outputs.image }}:${{ github.ref_name }}
             ${{ steps.meta.outputs.image }}:${{ github.ref_name }}-${{ steps.meta.outputs.sha }}

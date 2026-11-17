@@ -8,6 +8,9 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     steps:
       - uses: actions/checkout@v4
 
@@ -18,8 +21,12 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # El token baja PrintScript de GitHub Packages
       - name: Check (ktlint + tests)
         run: nix develop --command ./gradlew check
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Reports
         if: always()

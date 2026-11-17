@@ -19,6 +19,16 @@ kotlin {
 
 repositories {
     mavenCentral()
+    // PrintScript (la implementación del lenguaje). GitHub Packages pide token incluso para leer:
+    // en CI lo pone el workflow; localmente, GITHUB_TOKEN=$(gh auth token).
+    maven {
+        url = uri("https://maven.pkg.github.com/GarroteSantiago/PrintScript")
+        credentials {
+            username = System.getenv("GITHUB_ACTOR")
+            password = System.getenv("GITHUB_TOKEN")
+        }
+        content { includeGroup("org.printscript") }
+    }
 }
 
 dependencies {
@@ -28,6 +38,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
+    implementation("org.printscript:toolchain:2.0.0")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
