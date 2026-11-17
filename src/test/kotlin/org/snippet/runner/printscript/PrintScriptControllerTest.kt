@@ -50,6 +50,8 @@ class PrintScriptControllerTest(
             jsonPath("$.language") { value("printscript") }
             jsonPath("$.versions") { value(contains("1.0", "1.1")) }
             jsonPath("$.latest") { value("1.1") }
+            // From the resolved dependency, via build-info
+            jsonPath("$.parserVersion") { value("2.0.0") }
         }
     }
 

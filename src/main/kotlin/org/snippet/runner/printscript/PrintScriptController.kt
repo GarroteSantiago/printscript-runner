@@ -26,6 +26,7 @@ data class TestRequest(
 )
 
 data class VersionsResponse(
+    val parserVersion: String,
     val language: String,
     val versions: List<String>,
     val latest: String,
@@ -51,7 +52,7 @@ class PrintScriptController(
     private val runner: PrintScriptRunner,
 ) {
     @GetMapping("/versions")
-    fun versions() = VersionsResponse("printscript", runner.versions, runner.latestVersion)
+    fun versions() = VersionsResponse(runner.parserVersion, "printscript", runner.versions, runner.latestVersion)
 
     @GetMapping("/rules/{ruleType}")
     fun rules(

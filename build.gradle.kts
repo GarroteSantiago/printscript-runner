@@ -38,11 +38,14 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.printscript:toolchain:2.0.0")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
+    testImplementation("org.springframework.boot:spring-boot-testcontainers")
+    testImplementation("org.testcontainers:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
@@ -61,4 +64,26 @@ tasks.jacocoTestReport {
 
 tasks.bootJar {
     archiveFileName = "app.jar"
+}
+
+// META-INF/build-info.properties: `/versions` informs the PrintScript version actually on the
+// classpath as `parserVersion` (US-18). The jars carry no version of their own, so it's taken
+// from the resolved dependency graph here.
+springBoot {
+    buildInfo {
+        excludes = setOf("time")
+        properties {
+            additional.put(
+                "printscriptVersion",
+                provider {
+                    configurations.runtimeClasspath
+                        .get()
+                        .incoming.resolutionResult.allComponents
+                        .mapNotNull { it.moduleVersion }
+                        .first { it.group == "org.printscript" && it.name == "toolchain" }
+                        .version
+                },
+            )
+        }
+    }
 }

@@ -28,6 +28,7 @@
             # Utilidades
             curl
             jq
+            redis
           ];
 
           JAVA_HOME = java.home;

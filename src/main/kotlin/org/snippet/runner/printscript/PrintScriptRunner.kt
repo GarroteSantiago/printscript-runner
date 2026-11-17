@@ -11,6 +11,7 @@ import org.snippet.runner.common.error.BadRequestException
 import org.springframework.stereotype.Component
 import java.io.StringReader
 import java.util.Optional
+import java.util.Properties
 import org.printscript.diagnostics.Diagnostic as LibraryDiagnostic
 
 /**
@@ -25,6 +26,13 @@ class PrintScriptRunner {
 
     val versions = listOf("1.0", "1.1")
     val latestVersion = "1.1"
+
+    /**
+     * Version of the PrintScript library on the classpath (US-18: when it changes, the Snippet Service
+     * revalidates every snippet). The build writes it to `META-INF/build-info.properties` from the
+     * resolved dependency; `unknown` only when running without that file (e.g. from an IDE build).
+     */
+    val parserVersion: String = libraryVersion()
 
     /** Syntax and semantic check, without running the code. */
     fun validate(
@@ -114,6 +122,12 @@ class PrintScriptRunner {
         val errors = result.diagnostics.map { it.toDiagnostic() }
         return TestResult(result.isSuccess && outputs == expectedOutputs, outputs, errors)
     }
+
+    private fun libraryVersion(): String =
+        javaClass.classLoader
+            .getResourceAsStream("META-INF/build-info.properties")
+            ?.use { Properties().apply { load(it) }.getProperty("build.printscriptVersion") }
+            ?: "unknown"
 
     private fun parseVersion(version: String): LanguageVersion =
         when (version) {

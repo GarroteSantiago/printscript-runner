@@ -11,6 +11,10 @@ spring:
           # Auth0: https://<tenant>.auth0.com/ (con la barra final)
           issuer-uri: ${AUTH0_ISSUER_URI}
           audiences: ${AUTH0_AUDIENCE}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
 
 server:
   port: ${PORT:8080}
@@ -26,3 +30,15 @@ management:
     health:
       probes:
         enabled: true
+
+# Consumidor de snippet:jobs (contracts/redis-streams.md)
+streams:
+  enabled: true
+  # Vacío: el hostname del contenedor, así cada réplica es un consumidor distinto
+  consumer-name: ${STREAMS_CONSUMER_NAME:}
+  max-length: 10000
+  batch-size: 10
+  block: 2s
+  reclaim-interval: 30s
+  min-idle: 60s
+  max-deliveries: 3
