@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: printscript-runner
+  threads:
+    virtual:
+      enabled: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Auth0: https://<tenant>.auth0.com/ (con la barra final)
+          issuer-uri: ${AUTH0_ISSUER_URI}
+          audiences: ${AUTH0_AUDIENCE}
+
+server:
+  port: ${PORT:8080}
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      base-path: /
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
