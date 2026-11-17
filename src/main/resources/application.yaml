@@ -15,6 +15,10 @@ spring:
 server:
   port: ${PORT:8080}
   shutdown: graceful
+  servlet:
+    context-parameters:
+      # Mensaje WebSocket más grande que acepta Tomcat (por defecto 8 KiB): el start trae el snippet entero
+      "[org.apache.tomcat.websocket.textBufferSize]": 1048576
 
 management:
   endpoints:
@@ -26,3 +30,13 @@ management:
     health:
       probes:
         enabled: true
+
+# Ejecución interactiva por WebSocket (/ws/run, contracts/websocket.md)
+interactive-run:
+  # Toda la ejecución, incluida la espera de inputs
+  max-duration: ${RUN_MAX_DURATION:60s}
+  # Espera de un input después de cada input-request
+  input-timeout: ${RUN_INPUT_TIMEOUT:5m}
+  # Tope de output por ejecución: mensajes y tamaño total
+  max-outputs: ${RUN_MAX_OUTPUTS:10000}
+  max-output-size: ${RUN_MAX_OUTPUT_SIZE:1MB}

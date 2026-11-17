@@ -183,5 +183,66 @@ class PrintScriptRunnerTest {
         assertTrue(result.errors.isNotEmpty())
     }
 
+    // Records what the program does, answering each readInput from [answers]
+    private class RecordingIo(
+        vararg answers: String,
+    ) : ProgramIo {
+        val events = mutableListOf<String>()
+        private val pending = ArrayDeque(answers.toList())
+
+        override fun println(value: String) {
+            events += "out:$value"
+        }
+
+        override fun readInput(prompt: String): String {
+            events += "in:$prompt"
+            return pending.removeFirst()
+        }
+    }
+
+    @Test
+    fun `a run streams each println and asks for input only when it gets there`() {
+        val io = RecordingIo("Ada")
+        val code = "println(\"first\");\nlet name: string = readInput(\"Name?\");\nprintln(\"Hello \" + name);"
+
+        assertEquals(RunResult.Completed, runner.run(code, "1.1", io))
+        assertEquals(listOf("out:first", "in:Name?", "out:Hello Ada"), io.events)
+    }
+
+    @Test
+    fun `invalid code fails before printing anything`() {
+        val io = RecordingIo()
+
+        val result = runner.run("println(\"before\");\nlet x: number = \"text\";", "1.0", io)
+
+        assertTrue(result is RunResult.Failed)
+        assertEquals(2, result.diagnostics.single().line)
+        assertEquals(emptyList(), io.events)
+    }
+
+    @Test
+    fun `a runtime error fails after the outputs before it`() {
+        val io = RecordingIo("not a number")
+        val code = "println(\"go\");\nlet n: number = readInput(\"n\");\nprintln(n);"
+
+        val result = runner.run(code, "1.1", io)
+
+        assertTrue(result is RunResult.Failed)
+        assertEquals(2, result.diagnostics.single().line)
+        assertEquals(listOf("out:go", "in:n"), io.events)
+    }
+
+    @Test
+    fun `an abort from the callbacks ends the run and propagates`() {
+        val io =
+            object : ProgramIo {
+                override fun println(value: String) = throw RunAbortedException("stop")
+
+                override fun readInput(prompt: String) = ""
+            }
+
+        assertThrows<RunAbortedException> { runner.run("println(1);\nprintln(2);", "1.0", io) }
+    }
+
     private fun List<RuleDefinition>.toConfigs() = map { RuleConfig(it.name, it.isActive, it.value) }
 }

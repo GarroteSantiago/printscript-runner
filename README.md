@@ -42,6 +42,23 @@ El lenguaje es la librería `org.printscript:toolchain` (GitHub Packages de `Gar
 - `/format` y `/lint` con código que no parsea: 422 con `diagnostics`. `/lint` tampoco acepta errores semánticos (la librería no analiza código inválido).
 - `/test` corta con error si el snippet pide más `readInput` que los `inputs` dados.
 
+## Ejecución interactiva (`/ws/run`)
+
+WebSocket plano (sin STOMP) según `contracts/websocket.md`; solo lo usa el Snippet Service, que reenvía el token del usuario en el handshake (`Authorization: Bearer`, lo valida la cadena de seguridad HTTP) y ya chequeó el permiso.
+
+- Un `start` por socket (otro cierra con `4409`). Cada `println` sale como `output` en el momento; cada `readInput` manda `input-request` y bloquea hasta el `input`. Termina con `done` (`ok`, `error` o `stopped`) y cierra el socket; `stop` o cerrar el socket cortan la ejecución.
+- El código se valida antes de correr: si es inválido llega `error` con `diagnostics` sin ningún output.
+- `run/InteractiveRun.kt` corre el programa en un hilo virtual y no ve tipos de la librería (usa `PrintScriptRunner.run` con callbacks). Límites (`interactive-run.*`), cada uno termina en `error` + `done error`:
+
+| Propiedad | Variable | Default |
+|---|---|---|
+| `max-duration` (toda la ejecución, con las esperas) | `RUN_MAX_DURATION` | `60s` |
+| `input-timeout` (espera de cada input) | `RUN_INPUT_TIMEOUT` | `5m` |
+| `max-outputs` (mensajes `output`) | `RUN_MAX_OUTPUTS` | `10000` |
+| `max-output-size` (bytes de output) | `RUN_MAX_OUTPUT_SIZE` | `1MB` |
+
+- Mensajes entrantes de hasta 1 MiB (`server.servlet.context-parameters`); un cliente que no lee lo que se le manda (más de 512 KiB pendientes o 10 s bloqueado) pierde el socket.
+
 ## Qué trae la plantilla
 
 - `common/security`: todo exige un JWT válido de Auth0 salvo `/health`.

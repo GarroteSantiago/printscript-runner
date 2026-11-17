@@ -45,3 +45,30 @@ data class TestResult(
 class InvalidCodeException(
     val diagnostics: List<Diagnostic>,
 ) : UnprocessableContentException("The code is not valid PrintScript", mapOf("diagnostics" to diagnostics))
+
+/** What a running program does to the outside world. Called on the thread that runs the code. */
+interface ProgramIo {
+    /** Each `println`, as it happens. */
+    fun println(value: String)
+
+    /** Each `readInput`: blocks until there is an answer. */
+    fun readInput(prompt: String): String
+}
+
+/**
+ * Thrown by a [ProgramIo] to abandon the run (stopped, out of time, too much output). The adapter
+ * lets it through, so whoever drives the run decides what to report.
+ */
+class RunAbortedException(
+    message: String,
+) : RuntimeException(message)
+
+sealed interface RunResult {
+    data object Completed : RunResult
+
+    /** The code is invalid, or failed while running. */
+    data class Failed(
+        val message: String,
+        val diagnostics: List<Diagnostic>,
+    ) : RunResult
+}
