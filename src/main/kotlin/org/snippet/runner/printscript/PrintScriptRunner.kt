@@ -129,6 +129,38 @@ class PrintScriptRunner {
             ?.use { Properties().apply { load(it) }.getProperty("build.printscriptVersion") }
             ?: "unknown"
 
+    /**
+     * Runs the code, sending each `println` to [io] as it happens and asking [io] for each
+     * `readInput` only when the program gets there. The code is validated first, so invalid code
+     * fails before printing anything (the interpreter alone would run the statements before the
+     * error). Runs on the calling thread; a [RunAbortedException] thrown by [io] ends the run and
+     * propagates.
+     */
+    fun run(
+        content: String,
+        version: String,
+        io: ProgramIo,
+    ): RunResult {
+        val languageVersion = parseVersion(version)
+        val validation = printScript.validate(StringReader(content), languageVersion, ProgressReporter.NONE)
+        if (!validation.isSuccess) {
+            return RunResult.Failed("The code is not valid PrintScript", validation.diagnostics.map { it.toDiagnostic() })
+        }
+        val result =
+            printScript.execute(
+                StringReader(content),
+                languageVersion,
+                io::println,
+                io::readInput,
+                // Snippets don't get the runner's environment
+                { Optional.empty() },
+                ProgressReporter.NONE,
+            )
+        if (result.isSuccess) return RunResult.Completed
+        val diagnostics = result.diagnostics.map { it.toDiagnostic() }
+        return RunResult.Failed(diagnostics.firstOrNull()?.message ?: "The run failed", diagnostics)
+    }
+
     private fun parseVersion(version: String): LanguageVersion =
         when (version) {
             "1.0" -> LanguageVersion.V1_0_0
