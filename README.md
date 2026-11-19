@@ -114,4 +114,4 @@ git push -u origin dev prod
 gh repo edit <owner>/printscript-runner --default-branch dev
 ```
 
-No hace falta configurar secretos: CI usa el `GITHUB_TOKEN` del workflow para bajar PrintScript y publicar en GHCR. El paquete de PrintScript tiene que darle acceso de lectura a este repo (Package settings → Manage Actions access) si no son del mismo dueño o el paquete es privado.
+CI usa el `GITHUB_TOKEN` del workflow para bajar PrintScript y publicar en GHCR. Después de publicar dispara el despliegue de la rama en `snippet-searcher-infra`, con el secreto `DEPLOY_PAT` (token clásico con el scope `repo`). En Swarm, cada variable secreta llega como archivo: `VAR_FILE=/run/secrets/x` (`docker-entrypoint.sh`). El paquete de PrintScript tiene que darle acceso de lectura a este repo (Package settings → Manage Actions access) si no son del mismo dueño o el paquete es privado.
