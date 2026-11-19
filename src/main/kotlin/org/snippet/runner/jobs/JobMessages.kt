@@ -12,6 +12,9 @@ object Streams {
     const val RESULTS = "snippet:results"
     const val GROUP = "printscript-runner"
 
+    // The Snippet Service's group on snippet:results, to measure its backlog
+    const val SNIPPET_GROUP = "snippet-service"
+
     const val TYPE = "type"
     const val CORRELATION_ID = "correlationId"
     const val PAYLOAD = "payload"

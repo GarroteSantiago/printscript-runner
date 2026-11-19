@@ -1,9 +1,11 @@
 package org.snippet.runner.jobs
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import io.micrometer.core.instrument.MeterRegistry
 import org.junit.jupiter.api.Test
 import org.snippet.runner.common.streams.RedisStreamClient
 import org.snippet.runner.common.streams.StreamClient
+import org.snippet.runner.common.streams.StreamStats
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.data.domain.Range
@@ -17,6 +19,7 @@ import org.testcontainers.junit.jupiter.Testcontainers
 import java.time.Duration
 import java.util.UUID
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /** The consumer of `snippet:jobs` against a real Redis: XREADGROUP, XADD with trimming, XACK, XAUTOCLAIM and XPENDING. */
@@ -28,6 +31,7 @@ class RedisJobsIntegrationTest(
     @param:Autowired private val redis: StringRedisTemplate,
     @param:Autowired private val streams: StreamClient,
     @param:Autowired private val json: ObjectMapper,
+    @param:Autowired private val meters: MeterRegistry,
 ) {
     companion object {
         @Container
@@ -114,5 +118,20 @@ class RedisJobsIntegrationTest(
 
         // `~` trims whole nodes, so it keeps a bit more than asked, never all
         assertTrue(redis.opsForStream<String, String>().size(stream)!! < 500)
+    }
+
+    @Test
+    fun `stream stats come from XLEN and XINFO GROUPS, and both streams have gauges`() {
+        val stream = "stats-${UUID.randomUUID()}"
+        assertEquals(StreamStats(0, null, null), streams.stats(stream, "g"))
+        streams.createGroup(stream, "g")
+        streams.add(stream, mapOf(Streams.TYPE to "LINT"), 10_000)
+        streams.readNew(stream, "g", "c", 10, Duration.ofMillis(10))
+        repeat(2) { streams.add(stream, mapOf(Streams.TYPE to "LINT"), 10_000) }
+        assertEquals(StreamStats(3, 2, 1), streams.stats(stream, "g"))
+
+        listOf(Streams.JOBS to Streams.GROUP, Streams.RESULTS to Streams.SNIPPET_GROUP).forEach { (s, group) ->
+            assertNotNull(meters.find("redis.stream.lag").tags("stream", s, "group", group).gauge())
+        }
     }
 }
