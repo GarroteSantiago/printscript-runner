@@ -13,6 +13,7 @@ import org.snippet.runner.common.streams.StreamProperties
 import org.snippet.runner.printscript.FormatResponse
 import org.snippet.runner.printscript.LintResponse
 import org.snippet.runner.printscript.PrintScriptRunner
+import java.util.UUID
 
 /**
  * Runs each job of `snippet:jobs` with the same adapter the HTTP endpoints use and publishes its
@@ -32,7 +33,7 @@ class JobHandler(
     private val log = LoggerFactory.getLogger(javaClass)
 
     override fun handle(entry: StreamEntry) {
-        withCorrelationId(entry) {
+        withCorrelationId(entry) { correlationId ->
             val message = parse(entry) ?: return@withCorrelationId
             val (type, job) = message
             val result =
@@ -42,7 +43,7 @@ class JobHandler(
                     log.info("{} job {} of snippet {} failed: {}", type, job.jobId, job.snippetId, e.message)
                     JobResult(job.jobId, job.snippetId, ResultStatus.FAILED, error = e.message)
                 }
-            publish(entry, type, result)
+            publish(correlationId, type, result)
         }
     }
 
@@ -50,10 +51,10 @@ class JobHandler(
         entry: StreamEntry,
         deliveries: Long,
     ) {
-        withCorrelationId(entry) {
+        withCorrelationId(entry) { correlationId ->
             val (type, job) = parse(entry) ?: return@withCorrelationId
             val error = "Gave up after $deliveries deliveries"
-            publish(entry, type, JobResult(job.jobId, job.snippetId, ResultStatus.FAILED, error = error))
+            publish(correlationId, type, JobResult(job.jobId, job.snippetId, ResultStatus.FAILED, error = error))
         }
     }
 
@@ -81,14 +82,14 @@ class JobHandler(
         }
 
     private fun publish(
-        entry: StreamEntry,
+        correlationId: String,
         type: JobType,
         result: JobResult,
     ) {
         val fields =
             mapOf(
                 Streams.TYPE to type.name,
-                Streams.CORRELATION_ID to entry.correlationId(),
+                Streams.CORRELATION_ID to correlationId,
                 Streams.PAYLOAD to json.writeValueAsString(result),
             )
         streams.add(Streams.RESULTS, fields, properties.maxLength)
@@ -106,15 +107,18 @@ class JobHandler(
         return type to job
     }
 
-    private fun StreamEntry.correlationId() = fields[Streams.CORRELATION_ID].orEmpty()
-
+    /**
+     * Runs [block] with the job's correlation id in the MDC, so its log lines and its result carry it.
+     * A job without one (it shouldn't happen) gets a new one, so its result can still be followed.
+     */
     private inline fun withCorrelationId(
         entry: StreamEntry,
-        block: () -> Unit,
+        block: (String) -> Unit,
     ) {
-        MDC.put(CorrelationIdFilter.MDC_KEY, entry.correlationId())
+        val correlationId = entry.fields[Streams.CORRELATION_ID]?.takeIf { it.isNotBlank() } ?: UUID.randomUUID().toString()
+        MDC.put(CorrelationIdFilter.MDC_KEY, correlationId)
         try {
-            block()
+            block(correlationId)
         } finally {
             MDC.remove(CorrelationIdFilter.MDC_KEY)
         }

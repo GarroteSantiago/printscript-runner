@@ -4,6 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.junit.jupiter.api.Test
+import org.slf4j.MDC
+import org.snippet.runner.common.logging.CorrelationIdFilter
+import org.snippet.runner.common.streams.StreamClient
 import org.snippet.runner.common.streams.StreamProperties
 import org.snippet.runner.common.streams.StreamWorker
 import org.snippet.runner.printscript.PrintScriptRunner
@@ -153,5 +156,44 @@ class JobHandlerTest {
 
         assertTrue(results().isEmpty())
         assertTrue(client.pending(Streams.JOBS, Streams.GROUP).isEmpty())
+    }
+
+    @Test
+    fun `the job's correlation id is in the MDC while it runs and is cleared afterwards`() {
+        val seen = mutableListOf<String?>()
+        val recording =
+            object : StreamClient by client {
+                override fun add(
+                    stream: String,
+                    fields: Map<String, String>,
+                    maxLength: Long,
+                ): String {
+                    seen += MDC.get(CorrelationIdFilter.MDC_KEY)
+                    return client.add(stream, fields, maxLength)
+                }
+            }
+        val worker =
+            StreamWorker(
+                client,
+                Streams.JOBS,
+                Streams.GROUP,
+                "runner-1",
+                JobHandler(PrintScriptRunner(), recording, properties, json),
+                properties,
+            )
+        send("VALIDATE", job("println(1);"), correlationId = "abc-123")
+        worker.pollOnce()
+
+        assertEquals(listOf<String?>("abc-123"), seen)
+        assertNull(MDC.get(CorrelationIdFilter.MDC_KEY))
+    }
+
+    @Test
+    fun `a job without a correlation id gets a new one in its result`() {
+        send("VALIDATE", job("println(1);"), correlationId = "")
+        worker.pollOnce()
+
+        val (fields, _) = onlyResult()
+        assertTrue(fields.getValue(Streams.CORRELATION_ID).isNotBlank())
     }
 }
